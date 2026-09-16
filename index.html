@@ -1,0 +1,1672 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>个人所得税计算器 · 累计预扣与年度汇算</title>
+<style>
+  :root {
+    --bg: #f4f6f9;
+    --card: #ffffff;
+    --line: #e5e9f0;
+    --txt: #1f2937;
+    --muted: #6b7280;
+    --accent: #4f46e5;
+    --accent-weak: #eef2ff;
+    --green: #059669;
+    --green-weak: #ecfdf5;
+    --red: #dc2626;
+    --red-weak: #fef2f2;
+    --amber: #b45309;
+    --amber-weak: #fffbeb;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--txt);
+    font: 14px/1.6 "PingFang SC", "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
+  }
+  main { max-width: 1120px; margin: 0 auto; padding: 0 20px 48px; }
+
+  /* ── 顶栏 ─────────────────────────── */
+  .topbar {
+    background: linear-gradient(135deg, #4f46e5 0%, #6366f1 60%, #818cf8 100%);
+    color: #fff;
+    padding: 22px 0 26px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.08);
+  }
+  .topbar-inner {
+    max-width: 1120px; margin: 0 auto; padding: 0 20px;
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  }
+  .topbar h1 { font-size: 20px; margin: 0; font-weight: 600; }
+  .topbar .sub { font-size: 12.5px; opacity: .85; margin-top: 2px; }
+  .topbar .spacer { flex: 1; }
+  .topbar select, .topbar .btn-top {
+    border: 1px solid rgba(255,255,255,.55);
+    background: rgba(255,255,255,.14);
+    color: #fff;
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .topbar select option { color: #1f2937; }
+  .topbar .btn-top:hover { background: rgba(255,255,255,.28); }
+
+  /* ── 汇总卡片 ─────────────────────── */
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+    gap: 14px;
+    margin: -14px auto 22px;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 14px;
+    padding: 14px 16px;
+    box-shadow: 0 2px 10px rgba(31,41,55,.06);
+    border: 1px solid var(--line);
+  }
+  .card .k { font-size: 12.5px; color: var(--muted); }
+  .card .v { font-size: 21px; font-weight: 700; margin-top: 3px; font-variant-numeric: tabular-nums; }
+  .card .v small { font-size: 12px; font-weight: 400; color: var(--muted); }
+  .card .note { font-size: 11.5px; color: var(--muted); margin-top: 2px; min-height: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card.highlight { border-color: #c7d2fe; background: linear-gradient(180deg,#fbfbff, #f5f6ff); }
+  .v.green { color: var(--green); }
+  .v.red { color: var(--red); }
+
+  /* ── 面板 ─────────────────────────── */
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    box-shadow: 0 2px 10px rgba(31,41,55,.05);
+    padding: 20px 22px;
+    margin-bottom: 22px;
+  }
+  .panel-head {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+  .panel.collapsed .panel-head { margin-bottom: 0; }
+  .panel.collapsed > *:not(.panel-head) { display: none; }
+  .collapse-btn {
+    border: 1px solid var(--line); background: #fff; cursor: pointer;
+    font-size: 12px; color: var(--muted); padding: 5px 11px;
+    border-radius: 999px; line-height: 1; transition: all .12s;
+  }
+  .collapse-btn:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-weak); }
+  .collapse-btn .chev { display: inline-block; transition: transform .15s; font-size: 11px; }
+  .panel.collapsed .collapse-btn .chev { transform: rotate(-90deg); }
+  .panel.collapsed .collapse-btn { color: var(--accent); border-color: #c7d2fe; }
+  .panel-head h2 { font-size: 16px; margin: 0; font-weight: 600; }
+  .panel-head .spacer { flex: 1; }
+  .hint { color: var(--muted); font-size: 12.5px; margin: 10px 0 0; }
+  .hint code { background: var(--accent-weak); color: var(--accent); padding: 0 4px; border-radius: 4px; }
+
+  .btn {
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--txt);
+    border-radius: 8px;
+    padding: 6px 13px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all .12s;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #4338ca; color: #fff; }
+  .btn-danger { color: var(--red); }
+  .btn-danger:hover { border-color: var(--red); background: var(--red-weak); }
+
+  /* ── 月度表 ───────────────────────── */
+  .table-wrap { overflow-x: auto; }
+  table.months { width: 100%; border-collapse: collapse; min-width: 830px; }
+  table.months th, table.months td {
+    padding: 7px 8px; text-align: right; white-space: nowrap;
+    border-bottom: 1px solid var(--line);
+    font-variant-numeric: tabular-nums;
+  }
+  table.months th:first-child, table.months td:first-child,
+  table.months th:last-child, table.months td:last-child { text-align: left; }
+  table.months thead th { font-size: 12.5px; color: var(--muted); font-weight: 500; background: #fafbfc; position: sticky; top: 0; }
+  table.months input[type=number] {
+    width: 118px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px;
+    text-align: right; font: inherit; font-variant-numeric: tabular-nums; background: #fff;
+    transition: border .12s, box-shadow .12s;
+  }
+  table.months input[type=number]:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79,70,229,.12); }
+  table.months input[type=text] {
+    width: 100%; min-width: 90px; padding: 6px 8px; border: 1px solid transparent; border-radius: 8px;
+    font: inherit; color: var(--muted); background: transparent;
+  }
+  table.months input[type=text]:focus { outline: none; border-color: var(--line); background: #fff; color: var(--txt); }
+  table.months input::-webkit-outer-spin-button, table.months input::-webkit-inner-spin-button { opacity: .35; }
+  tr.empty td { color: #b0b7c3; }
+  tr.empty .c-cum, tr.empty .c-tax, tr.empty .c-net { color: #b0b7c3; }
+  tr.now td { background: var(--accent-weak); }
+  tr.now td:first-child { border-left: 3px solid var(--accent); border-radius: 3px 0 0 3px; }
+  .c-tax { font-weight: 600; }
+  .month-cell { font-weight: 600; white-space: nowrap; }
+  button.copy-prev {
+    border: none; background: transparent; cursor: pointer;
+    color: #b6bdc9; font-size: 13px; padding: 2px 5px;
+    border-radius: 5px; line-height: 1; vertical-align: 1px;
+  }
+  button.copy-prev:hover { color: var(--accent); background: var(--accent-weak); }
+
+  /* ── 专项附加扣除表 ───────────────── */
+  table.deds { width: 100%; border-collapse: collapse; min-width: 780px; }
+  table.deds th, table.deds td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; font-size: 13px; }
+  table.deds thead th { color: var(--muted); font-weight: 500; background: #fafbfc; }
+  table.deds th.num, table.deds td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.deds select, .custom-row select {
+    padding: 5px 8px; border: 1px solid var(--line); border-radius: 7px;
+    font: inherit; background: #fff; max-width: 300px;
+  }
+  table.deds select:focus, .custom-row select:focus { outline: none; border-color: var(--accent); }
+  table.deds input[type=number] {
+    padding: 5px 8px; border: 1px solid var(--line); border-radius: 7px;
+    font: inherit; width: 90px; text-align: right;
+  }
+  .custom-row {
+    display: flex; align-items: center; gap: 8px; margin-top: 10px;
+    flex-wrap: wrap; font-size: 13px; color: var(--muted);
+  }
+  .custom-row input[type=text] { width: 150px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 7px; font: inherit; }
+  .custom-row input[type=number] { width: 100px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 7px; font: inherit; text-align: right; }
+  .custom-row input:focus { outline: none; border-color: var(--accent); }
+  .custom-row label { display: inline-flex; align-items: center; gap: 4px; color: var(--txt); }
+  .custom-row .btn { padding: 3px 9px; font-size: 12px; }
+
+  /* ── 双栏区块 ─────────────────────── */
+  .grid2 { display: grid; grid-template-columns: 340px 1fr; gap: 26px; }
+  @media (max-width: 880px) { .grid2 { grid-template-columns: 1fr; } }
+  .form-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .form-row label { width: 110px; font-size: 13px; color: var(--muted); flex-shrink: 0; }
+  .form-row input[type=number], .form-row select {
+    flex: 1; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px;
+    font: inherit; text-align: right; font-variant-numeric: tabular-nums;
+  }
+  .form-row select { text-align: left; }
+  .form-row input:focus, .form-row select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79,70,229,.12); }
+  .radio-group { display: flex; gap: 14px; flex-wrap: wrap; flex: 1; }
+  .radio-group label { width: auto; display: inline-flex; align-items: center; gap: 5px; color: var(--txt); cursor: pointer; }
+
+  .result-box { background: #fafbfc; border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; }
+  .result-box h3 { margin: 0 0 10px; font-size: 13.5px; color: var(--muted); font-weight: 500; }
+  table.cmp { width: 100%; border-collapse: collapse; }
+  table.cmp th, table.cmp td { padding: 7px 6px; text-align: right; font-variant-numeric: tabular-nums; border-bottom: 1px dashed var(--line); }
+  table.cmp th:first-child, table.cmp td:first-child { text-align: left; }
+  table.cmp thead th { color: var(--muted); font-weight: 500; font-size: 12.5px; }
+  table.cmp tr.chosen { background: var(--green-weak); }
+  table.cmp tr.chosen td:first-child { font-weight: 600; }
+  .badge { display: inline-block; font-size: 11px; background: var(--green); color: #fff; border-radius: 999px; padding: 1px 8px; margin-left: 6px; }
+  .save-line { margin: 10px 0 0; font-size: 13px; color: var(--green); font-weight: 600; }
+  .warn {
+    margin-top: 12px; padding: 9px 12px; border-radius: 9px; font-size: 12.5px;
+    background: var(--amber-weak); color: var(--amber); border: 1px solid #fde68a;
+  }
+
+  .kv { width: 100%; border-collapse: collapse; }
+  .kv td { padding: 6px 4px; border-bottom: 1px dashed var(--line); font-variant-numeric: tabular-nums; }
+  .kv td:first-child { color: var(--muted); }
+  .kv td:last-child { text-align: right; font-weight: 600; }
+  .kv tr.big td { font-size: 16px; }
+  .kv tr.big td:last-child { font-size: 19px; }
+  .tips { margin: 12px 0 0; padding-left: 18px; color: var(--muted); font-size: 12.5px; }
+  .tips li { margin-bottom: 4px; }
+
+  /* ── 图表 ─────────────────────────── */
+  .legend { display: flex; gap: 18px; font-size: 12.5px; color: var(--muted); margin-bottom: 6px; flex-wrap: wrap; }
+  .legend .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+  #chart svg, #taxChart svg { width: 100%; height: auto; display: block; }
+  .chart-empty { color: #b0b7c3; text-align: center; padding: 42px 0; font-size: 13px; }
+  .chart-title { font-size: 13px; font-weight: 600; margin: 10px 0 6px; }
+  .chart-duo { display: grid; grid-template-columns: 320px 1fr; gap: 26px; align-items: start; }
+  @media (max-width: 880px) { .chart-duo { grid-template-columns: 1fr; } }
+  .pie-wrap { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+  .pie-wrap svg { flex-shrink: 0; }
+  .pie-legend { list-style: none; margin: 0; padding: 0; font-size: 12.5px; color: var(--muted); }
+  .pie-legend li { margin-bottom: 10px; }
+  .pie-legend .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+  .pie-legend b { display: block; color: var(--txt); font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .tips-list { margin: 10px 0 0; padding: 0; list-style: none; color: var(--muted); font-size: 12.5px; }
+  .tips-list li { position: relative; padding-left: 14px; margin-bottom: 4px; }
+  .tips-list li::before { content: '•'; position: absolute; left: 2px; font-weight: 700; color: var(--accent); }
+  .tips-list b { color: var(--txt); font-weight: 600; }
+
+  /* ── 参考信息 ─────────────────────── */
+  details { margin-bottom: 12px; }
+  details summary { cursor: pointer; font-weight: 600; font-size: 13.5px; padding: 4px 0; }
+  details table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+  details th, details td { border: 1px solid var(--line); padding: 6px 10px; text-align: right; font-variant-numeric: tabular-nums; }
+  details th:first-child, details td:first-child { text-align: center; }
+  details thead th { background: #fafbfc; color: var(--muted); font-weight: 500; }
+  .formula { background: #fafbfc; border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; font-size: 13px; margin-top: 8px; }
+  .formula p { margin: 6px 0; }
+  footer { text-align: center; color: #9ca3af; font-size: 12px; padding: 6px 20px 30px; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div>
+      <h1>🧮 个人所得税计算器</h1>
+      <div class="sub">累计预扣 · 年度汇算 · 退税补税测算 —— 支持中途工资变化，逐月精确计算</div>
+    </div>
+    <div class="spacer"></div>
+    <select id="yearSelect" title="选择年度"></select>
+    <button class="btn-top" id="btnFile" title="绑定一个本地 JSON 文件，此后数据变更自动写入该文件">自动保存到文件</button>
+    <button class="btn-top" id="btnImport" title="从 JSON 备份文件恢复数据">导入</button>
+    <button class="btn-top" id="btnClear" title="清空当前年度全部数据">清空</button>
+    <input type="file" id="fileImport" accept=".json,application/json" hidden>
+  </div>
+</header>
+
+<main>
+  <!-- 汇总卡片 -->
+  <section class="cards">
+    <div class="card"><div class="k">全年税前合计（工资＋年终奖）</div><div class="v" id="cardGross">0<small> 元</small></div><div class="note" id="cardGrossNote"></div></div>
+    <div class="card"><div class="k">全年预计到手</div><div class="v" id="cardNet">0<small> 元</small></div><div class="note">＝ 税前 − 五险一金 − 年度总个税</div></div>
+    <div class="card"><div class="k">全年已预缴个税</div><div class="v" id="cardWithheld">0<small> 元</small></div><div class="note" id="cardWithheldNote"></div></div>
+    <div class="card highlight"><div class="k">年度汇算应补 / 退税</div><div class="v" id="cardSettle">—</div><div class="note" id="cardSettleNote"></div></div>
+    <div class="card"><div class="k">下月预扣预测</div><div class="v" id="cardNext">—</div><div class="note" id="cardNextNote"></div></div>
+    <div class="card"><div class="k">综合税负率</div><div class="v" id="cardRate">—</div><div class="note">年度总个税 ÷ 税前合计</div></div>
+  </section>
+
+  <!-- ① 月度录入 -->
+  <section class="panel">
+    <div class="panel-head">
+      <h2>① 月度收入录入 <span style="color:var(--muted);font-weight:400;font-size:12.5px">（每月独立填写，支持涨薪 / 降薪 / 缺勤；未填月份自动跳过）</span></h2>
+      <div class="spacer"></div>
+      <button class="btn btn-primary" id="btnFill" title="用最近一个已填月份的数据，填充其后的空月份（用于预估未来月份）">填充剩余月份 ↧</button>
+    </div>
+    <div class="table-wrap">
+      <table class="months" id="monthTable">
+        <thead>
+          <tr>
+            <th>月份</th>
+            <th>税前工资（应发）</th>
+            <th>五险一金（个人缴纳）</th>
+            <th>累计应纳税所得额</th>
+            <th>当月预扣个税</th>
+            <th>当月到手</th>
+            <th>备注</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <ul class="tips-list">
+      <li>每月独立填写，支持<b>涨薪 / 降薪 / 请假扣款</b>；未填的月份自动跳过，未来月份填<b>预估工资</b>即可预测之后的税款。</li>
+      <li>与上月相同时，点月份旁的 <b>⧉</b> 一键复制上一月数据；整段相同可用右上角「填充剩余月份」。</li>
+      <li><b>浅紫色行</b>是当前月份，按系统日期自动判断（如 10 月打开页面则高亮 10 月）。</li>
+      <li><b>当月到手</b> ＝ 税前工资 − 五险一金 − 当月预扣个税（不含年终奖）。</li>
+      <li>专项附加扣除在 ② 区配置：勾选「已申报」的项目按月计入本表，其余到 ④ 汇算时再扣。</li>
+      <li>数据自动保存在本浏览器；通过本地服务打开时自动写入同目录的「个税数据.json」。</li>
+    </ul>
+  </section>
+
+  <!-- ② 专项附加扣除 -->
+  <section class="panel">
+    <div class="panel-head">
+      <h2>② 专项附加扣除</h2>
+      <div class="spacer"></div>
+      <span class="hint" style="margin:0">按国家标准配置，自动计入每月预扣；未申报的项目仅在年度汇算时扣除</span>
+    </div>
+    <div class="table-wrap">
+      <table class="deds" id="dedTable">
+        <thead>
+          <tr><th>项目</th><th>标准 / 配置</th><th class="num">每月扣除</th><th>起始月份</th><th>结束月份</th><th>已申报至单位</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>子女教育</td>
+            <td><select id="dChildren"></select> 孩 × 2,000 元/孩·月</td>
+            <td class="num" id="vChildren">0.00</td>
+            <td><select class="dmth" data-k="children" data-f="start"></select></td>
+            <td><select class="dmth" data-k="children" data-f="end"></select></td>
+            <td><input type="checkbox" class="ddec" data-k="children" checked></td>
+          </tr>
+          <tr>
+            <td>3 岁以下婴幼儿照护</td>
+            <td><select id="dInfant"></select> 孩 × 2,000 元/孩·月</td>
+            <td class="num" id="vInfant">0.00</td>
+            <td><select class="dmth" data-k="infant" data-f="start"></select></td>
+            <td><select class="dmth" data-k="infant" data-f="end"></select></td>
+            <td><input type="checkbox" class="ddec" data-k="infant" checked></td>
+          </tr>
+          <tr>
+            <td>赡养老人</td>
+            <td><select id="dElderlyMode">
+              <option value="off">不扣除</option>
+              <option value="only">独生子女（3,000 元/月）</option>
+              <option value="share">非独生子女分摊</option>
+            </select>
+            <input type="number" id="dElderlyShare" min="0" max="1500" step="50" title="分摊额度，每人不超过 1,500 元/月"> 元/月</td>
+            <td class="num" id="vElderly">0.00</td>
+            <td><select class="dmth" data-k="elderly" data-f="start"></select></td>
+            <td><select class="dmth" data-k="elderly" data-f="end"></select></td>
+            <td><input type="checkbox" class="ddec" data-k="elderly" checked></td>
+          </tr>
+          <tr>
+            <td>住房贷款利息</td>
+            <td><select id="dMortgage"><option value="0">不扣除</option><option value="1">扣除（1,000 元/月）</option></select></td>
+            <td class="num" id="vMortgage">0.00</td>
+            <td><select class="dmth" data-k="mortgage" data-f="start"></select></td>
+            <td><select class="dmth" data-k="mortgage" data-f="end"></select></td>
+            <td><input type="checkbox" class="ddec" data-k="mortgage" checked></td>
+          </tr>
+          <tr>
+            <td>住房租金</td>
+            <td><select id="dRent">
+              <option value="0">不扣除</option>
+              <option value="1500">1,500 元/月（直辖市 / 省会 / 计划单列市）</option>
+              <option value="1100">1,100 元/月（市辖区户籍人口 &gt; 100 万）</option>
+              <option value="800">800 元/月（市辖区户籍人口 ≤ 100 万）</option>
+            </select></td>
+            <td class="num" id="vRent">0.00</td>
+            <td><select class="dmth" data-k="rent" data-f="start"></select></td>
+            <td><select class="dmth" data-k="rent" data-f="end"></select></td>
+            <td><input type="checkbox" class="ddec" data-k="rent" checked></td>
+          </tr>
+          <tr>
+            <td>继续教育 · 学历</td>
+            <td><select id="dEduDegree"><option value="0">不扣除</option><option value="1">在读（400 元/月）</option></select></td>
+            <td class="num" id="vEduDegree">0.00</td>
+            <td><select class="dmth" data-k="eduDegree" data-f="start"></select></td>
+            <td><select class="dmth" data-k="eduDegree" data-f="end"></select></td>
+            <td><input type="checkbox" class="ddec" data-k="eduDegree" checked></td>
+          </tr>
+          <tr>
+            <td>继续教育 · 职业资格</td>
+            <td><select id="dEduCert"><option value="0">无</option><option value="1">当年取证</option></select>
+            <select id="dCertMonth"></select> 取得 · 3,600 元/年</td>
+            <td class="num" style="color:var(--muted)">仅汇算扣除</td>
+            <td>—</td>
+            <td>—</td>
+            <td>—</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div id="customRows"></div>
+    <div style="margin-top:10px"><button class="btn" id="btnAddCustom">＋ 添加自定义扣除项</button></div>
+    <ul class="tips-list">
+      <li>勾选「已申报至单位」→ <b>按月计入 ① 的预扣</b>，对应单位每月工资里已经扣了附加；不勾 → 不影响每月税款，到 ④ 年度汇算统一扣除。<b>两种全年总税相同</b>，只是「平时少缴」与「先多缴、汇算退」的节奏差别。</li>
+      <li>起止月份默认 <b>1—12 月全年有效</b>；年中才开始或中途停止享受（租房到期、继续教育毕业等）时调整对应月份。</li>
+      <li>住房贷款利息与住房租金<b>不可同时</b>享受；大病医疗支出在 ④ 中填写。</li>
+    </ul>
+  </section>
+
+  <!-- ③ 年终奖 -->
+  <section class="panel">
+    <div class="panel-head"><h2>③ 全年一次性奖金（年终奖）</h2></div>
+    <div class="grid2">
+      <div>
+        <div class="form-row">
+          <label>奖金金额（元）</label>
+          <input type="number" id="bonusAmount" min="0" step="0.01" placeholder="0.00">
+        </div>
+        <div class="form-row">
+          <label>发放月份</label>
+          <select id="bonusMonth"></select>
+        </div>
+        <div class="form-row">
+          <label>发放时已预扣个税</label>
+          <input type="number" id="bonusWithheld" min="0" step="0.01" placeholder="选填；单位单独计税预扣的金额">
+        </div>
+        <div class="form-row">
+          <label>计税方式</label>
+          <div class="radio-group" id="bonusMode">
+            <label><input type="radio" name="bmode" value="auto" checked>自动择优</label>
+            <label><input type="radio" name="bmode" value="separate">单独计税</label>
+            <label><input type="radio" name="bmode" value="combined">并入综合所得</label>
+          </div>
+        </div>
+        <ul class="tips-list">
+          <li><b>计税方式</b>：自动按全年总税额对比两种方式并推荐更省者，也可手动锁定；单独计税政策目前执行至 2027 年底。</li>
+          <li><b>按实际发放年度填写</b>：奖金算在发放（取得）的当年——如 2025 年度的奖金在 2026 年 2 月发放，个税 APP 记在 2026 年 2 月，就填 2026 年度、参与 2026 年度汇算。</li>
+          <li><b>发放时已预扣个税</b>：若单位当月已就这笔奖金单独预扣过税，填入 APP 中该笔奖金的「已申报税额」，否则汇算会把这笔已缴的税重复算成补税。</li>
+        </ul>
+      </div>
+      <div class="result-box" id="bonusResult"></div>
+    </div>
+  </section>
+
+  <!-- ③ 年度汇算 -->
+  <section class="panel">
+    <div class="panel-head"><h2>④ 年度汇算（退税 / 补税）</h2></div>
+    <div class="grid2">
+      <div>
+        <div class="form-row">
+          <label>大病医疗自付（年）</label>
+          <input type="number" id="medical" min="0" step="0.01" placeholder="自付超过 15,000 的部分可扣，上限 80,000">
+        </div>
+        <div class="form-row">
+          <label>其他扣除（年）</label>
+          <input type="number" id="other" min="0" step="0.01" placeholder="企业年金、商业健康险等">
+        </div>
+        <ul class="tips-list">
+          <li><b>汇算公式</b>：年度应纳税所得额 ＝ 全年收入 − 60,000 − 五险一金 − 专项附加扣除 − 大病医疗 − 其他扣除。</li>
+          <li>即使当年只工作了几个月，基本减除费用仍按<b>全年 60,000</b> 计算——这正是年中入职 / 离职常产生退税的原因。</li>
+          <li>年度汇算在次年 <b>3 月 1 日 — 6 月 30 日</b>于个税 APP 办理，多退少补；补税 ≤ 400 元且已依法预缴的可免办。</li>
+        </ul>
+      </div>
+      <div class="result-box" id="annualResult"></div>
+    </div>
+  </section>
+
+  <!-- ⑤ 图表分析 -->
+  <section class="panel">
+    <div class="panel-head"><h2>⑤ 图表分析</h2></div>
+    <div class="chart-title">月度工资构成 · 堆叠柱状图</div>
+    <div class="legend">
+      <span><span class="dot" style="background:#10b981"></span>到手</span>
+      <span><span class="dot" style="background:#94a3b8"></span>五险一金（个人）</span>
+      <span><span class="dot" style="background:#ef4444"></span>预扣个税</span>
+    </div>
+    <div id="chart"></div>
+    <div class="chart-duo" style="margin-top:20px">
+      <div>
+        <div class="chart-title">全年资金去向 · 饼图</div>
+        <div id="pieChart" class="pie-wrap"></div>
+      </div>
+      <div>
+        <div class="chart-title">每月预扣个税 × 适用税率 · 柱状图</div>
+        <div class="legend"><span>柱高 = 当月预扣个税；颜色越深税率越高，柱顶标签为税率变化点</span></div>
+        <div id="taxChart"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ⑤ 参考 -->
+  <section class="panel">
+    <div class="panel-head"><h2>⑥ 计算口径与税率表</h2></div>
+    <details>
+      <summary>名词解释（白话版）</summary>
+      <div class="formula">
+        <p><b>累计预扣法</b>：每月税款按「年初至当月的累计收入 − 累计扣除」计算累计应缴税，再减去之前月份已缴的部分。涨薪后累计数跨入更高税率档的当月，扣税会明显增大。</p>
+        <p><b>速算扣除数</b>：把分段累计算税简化成一步的常数，「应纳税所得额 × 税率 − 速算扣除数」的结果与分段计算完全一致。</p>
+        <p><b>年度汇算</b>：次年 3—6 月把全年综合所得重新算一遍总税额，与全年已预缴的对比，多退少补。</p>
+        <p><b>专项附加扣除</b>：子女教育、婴幼儿照护、赡养老人、房贷利息 / 住房租金、继续教育、大病医疗等法定减除项目。</p>
+        <p><b>年终奖盲区</b>：奖金在特定区间内多发一元、到手反而变少，因为整笔奖金跳进了更高税率档；落入盲区时工具会提醒。</p>
+      </div>
+    </details>
+    <details>
+      <summary>累计预扣法与年度汇算公式</summary>
+      <div class="formula">
+        <p><b>月度预扣（工资薪金，居民个人）：</b></p>
+        <p>累计应纳税所得额 ＝ 累计收入 − 5,000 × 月份数 − 累计五险一金 − 累计专项附加扣除</p>
+        <p>累计应预扣税 ＝ 累计应纳税所得额 × 预扣率 − 速算扣除数</p>
+        <p>当月预扣税 ＝ max(0, 累计应预扣税 − 累计已预扣税)（负数当月不退，留抵以后月份）</p>
+        <p style="margin-top:10px"><b>年度汇算：</b>应补（＋）/ 退（−）税额 ＝ 年度应纳税额 − 全年已预缴税额</p>
+        <p><b>年终奖单独计税：</b>奖金 ÷ 12 按月度税率表定税率，税额 ＝ 奖金 × 税率 − 速算扣除数</p>
+      </div>
+    </details>
+    <details>
+      <summary>综合所得年度税率表（预扣率表同）</summary>
+      <table>
+        <thead><tr><th>级数</th><th>全年应纳税所得额</th><th>税率</th><th>速算扣除数</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>不超过 36,000 元</td><td>3%</td><td>0</td></tr>
+          <tr><td>2</td><td>36,000 ~ 144,000 元</td><td>10%</td><td>2,520</td></tr>
+          <tr><td>3</td><td>144,000 ~ 300,000 元</td><td>20%</td><td>16,920</td></tr>
+          <tr><td>4</td><td>300,000 ~ 420,000 元</td><td>25%</td><td>31,920</td></tr>
+          <tr><td>5</td><td>420,000 ~ 660,000 元</td><td>30%</td><td>52,920</td></tr>
+          <tr><td>6</td><td>660,000 ~ 960,000 元</td><td>35%</td><td>85,920</td></tr>
+          <tr><td>7</td><td>超过 960,000 元</td><td>45%</td><td>181,920</td></tr>
+        </tbody>
+      </table>
+    </details>
+    <details>
+      <summary>年终奖单独计税 · 月度税率表（按奖金 ÷ 12 查表）</summary>
+      <table>
+        <thead><tr><th>级数</th><th>每月数额（奖金÷12）</th><th>税率</th><th>速算扣除数</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>不超过 3,000 元</td><td>3%</td><td>0</td></tr>
+          <tr><td>2</td><td>3,000 ~ 12,000 元</td><td>10%</td><td>210</td></tr>
+          <tr><td>3</td><td>12,000 ~ 25,000 元</td><td>20%</td><td>1,410</td></tr>
+          <tr><td>4</td><td>25,000 ~ 35,000 元</td><td>25%</td><td>2,660</td></tr>
+          <tr><td>5</td><td>35,000 ~ 55,000 元</td><td>30%</td><td>4,410</td></tr>
+          <tr><td>6</td><td>55,000 ~ 80,000 元</td><td>35%</td><td>7,160</td></tr>
+          <tr><td>7</td><td>超过 80,000 元</td><td>45%</td><td>15,160</td></tr>
+        </tbody>
+      </table>
+    </details>
+  </section>
+</main>
+
+<footer>
+  本工具为纯本地网页，不上传任何服务器：数据自动保存在浏览器 localStorage；
+  通过本地服务（serve.cjs）打开时自动写入同目录「个税数据.json」，双击打开时可绑定文件自动同步（Chromium 系浏览器）。
+  计算结果供参考，实际以个人所得税 APP 及主管税务机关核定为准。
+</footer>
+
+<script>
+/*__ENGINE_START__*/
+const TaxEngine = (function () {
+  'use strict';
+  var BASIC_MONTHLY = 5000;
+
+  var ANNUAL_BRACKETS = [
+    { limit: 36000,    rate: 0.03, quick: 0 },
+    { limit: 144000,   rate: 0.10, quick: 2520 },
+    { limit: 300000,   rate: 0.20, quick: 16920 },
+    { limit: 420000,   rate: 0.25, quick: 31920 },
+    { limit: 660000,   rate: 0.30, quick: 52920 },
+    { limit: 960000,   rate: 0.35, quick: 85920 },
+    { limit: Infinity, rate: 0.45, quick: 181920 }
+  ];
+
+  var MONTHLY_BRACKETS = [
+    { limit: 3000,    rate: 0.03, quick: 0 },
+    { limit: 12000,   rate: 0.10, quick: 210 },
+    { limit: 25000,   rate: 0.20, quick: 1410 },
+    { limit: 35000,   rate: 0.25, quick: 2660 },
+    { limit: 55000,   rate: 0.30, quick: 4410 },
+    { limit: 80000,   rate: 0.35, quick: 7160 },
+    { limit: Infinity, rate: 0.45, quick: 15160 }
+  ];
+
+  function round2(v) { return Math.round((v + Number.EPSILON) * 100) / 100; }
+
+  function findBracket(table, amount) {
+    for (var i = 0; i < table.length; i++) if (amount <= table[i].limit) return table[i];
+    return table[table.length - 1];
+  }
+
+  function annualTaxOf(taxable) {
+    if (taxable <= 0) return { tax: 0, rate: 0, quick: 0 };
+    var b = findBracket(ANNUAL_BRACKETS, taxable);
+    return { tax: round2(taxable * b.rate - b.quick), rate: b.rate, quick: b.quick };
+  }
+
+  function bonusSeparateTax(bonus) {
+    if (!(bonus > 0)) return 0;
+    var b = findBracket(MONTHLY_BRACKETS, bonus / 12);
+    return round2(bonus * b.rate - b.quick);
+  }
+
+  function bonusBlindZones() {
+    var zones = [];
+    for (var i = 0; i < MONTHLY_BRACKETS.length - 1; i++) {
+      var cur = MONTHLY_BRACKETS[i], nxt = MONTHLY_BRACKETS[i + 1];
+      var boundary = cur.limit * 12;
+      var upper = (boundary * (1 - cur.rate) + cur.quick - nxt.quick) / (1 - nxt.rate);
+      if (upper > boundary) zones.push({ from: boundary, to: round2(upper) });
+    }
+    return zones;
+  }
+
+  function inBonusBlindZone(bonus) {
+    if (!(bonus > 0)) return null;
+    var zones = bonusBlindZones();
+    for (var i = 0; i < zones.length; i++) {
+      if (bonus > zones[i].from && bonus < zones[i].to) return zones[i];
+    }
+    return null;
+  }
+
+  function clampNum(v) { var n = Number(v); if (!isFinite(n) || n < 0) n = Math.max(0, n) || 0; return n; }
+
+  function computeMonthly(months) {
+    var rows = [];
+    var cumSalary = 0, cumIns = 0, cumDed = 0, cumFee = 0, withheld = 0, filledCount = 0;
+    var totalSalary = 0, totalIns = 0, totalDed = 0;
+    for (var i = 0; i < 12; i++) {
+      var m = months[i] || {};
+      var salary = clampNum(m.salary), ins = clampNum(m.ins), ded = clampNum(m.ded);
+      var filled = salary > 0 || ins > 0 || ded > 0;
+      if (!filled) { rows.push({ month: i + 1, filled: false }); continue; }
+      filledCount++;
+      cumSalary += salary; cumIns += ins; cumDed += ded; cumFee += BASIC_MONTHLY;
+      totalSalary += salary; totalIns += ins; totalDed += ded;
+      var cumTaxable = Math.max(0, round2(cumSalary - cumFee - cumIns - cumDed));
+      var a = annualTaxOf(cumTaxable);
+      var monthTax = round2(Math.max(0, a.tax - withheld));
+      rows.push({
+        month: i + 1, filled: true, salary: salary, ins: ins, ded: ded,
+        cumTaxable: cumTaxable, rate: a.rate, monthTax: monthTax,
+        takeHome: round2(salary - ins - monthTax)
+      });
+      withheld = round2(withheld + monthTax);
+    }
+    return {
+      rows: rows, filledCount: filledCount,
+      totalSalary: round2(totalSalary), totalIns: round2(totalIns), totalDed: round2(totalDed),
+      totalWithheld: withheld
+    };
+  }
+
+  function medicalDeductible(spent) {
+    var s = clampNum(spent);
+    return Math.min(80000, Math.max(0, s - 15000));
+  }
+
+  function computeAnnual(months, opts) {
+    var o = opts || {};
+    var bonus = clampNum(o.bonus);
+    var mode = (o.bonusMode === 'separate' || o.bonusMode === 'combined') ? o.bonusMode : 'auto';
+    var med = medicalDeductible(o.medicalSpent);
+    var other = clampNum(o.other);
+    var m = computeMonthly(months);
+    // annualDeduction：已申报至单位的专项附加全年合计（未提供时回退为月度累计值）
+    // extraDeduction：未申报、仅在年度汇算时扣除的部分（含职业资格继续教育 3,600）
+    var annualDed = (o.annualDeduction == null) ? m.totalDed : clampNum(o.annualDeduction);
+    var extraDed = clampNum(o.extraDeduction);
+    // bonusWithheld：单位发放奖金当月已单独预扣的个税（从个税 APP「已申报税额」可查）
+    var bonusWithheld = clampNum(o.bonusWithheld);
+
+    var base = m.totalSalary - 60000 - m.totalIns - annualDed - extraDed - med - other;
+
+    var sep = { taxable: Math.max(0, round2(base)), bonusTax: bonusSeparateTax(bonus) };
+    sep.tax = annualTaxOf(sep.taxable).tax;
+    sep.total = round2(sep.tax + sep.bonusTax);
+
+    var com = { taxable: Math.max(0, round2(base + bonus)) };
+    com.tax = annualTaxOf(com.taxable).tax;
+    com.total = com.tax;
+
+    var chosenMode = mode === 'auto' ? (sep.total <= com.total ? 'separate' : 'combined') : mode;
+    var finalTax = chosenMode === 'separate' ? sep.total : com.total;
+    var settle = round2(finalTax - m.totalWithheld - bonusWithheld);
+    var grossIncome = round2(m.totalSalary + bonus);
+    var totalPrepaid = round2(m.totalWithheld + bonusWithheld);
+
+    var tips = [];
+    if (settle > 0 && settle <= 400) tips.push('补税金额不超过 400 元，若平时已依法预扣预缴，可免于办理年度汇算。');
+    if (settle > 0 && grossIncome <= 120000) tips.push('综合所得年收入不超过 12 万元且需要补税，可免于办理年度汇算。');
+    if (settle < 0) tips.push('存在多预缴的税款，可在次年 3 月 1 日至 6 月 30 日登录个人所得税 APP 办理汇算申请退税。');
+
+    return {
+      monthly: m, bonus: bonus, requestedMode: mode, chosenMode: chosenMode,
+      separate: sep, combined: com, finalTax: finalTax, settle: settle,
+      grossIncome: grossIncome, medicalDeductible: med, other: other,
+      annualDeduction: annualDed, extraDeduction: extraDed,
+      bonusWithheld: bonusWithheld, totalPrepaid: totalPrepaid,
+      netIncome: round2(grossIncome - m.totalIns - finalTax),
+      taxRate: grossIncome > 0 ? finalTax / grossIncome : 0,
+      tips: tips
+    };
+  }
+
+  function predictNextMonth(months, currentMonth) {
+    var m = computeMonthly(months);
+    if (!(currentMonth >= 1 && currentMonth <= 11)) return { available: false, reason: 'yearEnd' };
+    var target = currentMonth + 1;
+    var row = m.rows[target - 1];
+    if (row && row.filled) return { available: true, month: target, tax: row.monthTax, source: 'filled' };
+    var last = -1;
+    for (var i = 0; i < 12; i++) if (m.rows[i].filled) last = i;
+    if (last < 0) return { available: false, reason: 'noData' };
+    var src = months[last] || {};
+    var salary = clampNum(src.salary), ins = clampNum(src.ins), ded = clampNum(src.ded);
+    var cum = m.rows[last];
+    var newCumTaxable = Math.max(0, round2(cum.cumTaxable + salary - BASIC_MONTHLY - ins - ded));
+    var a = annualTaxOf(newCumTaxable);
+    var tax = round2(Math.max(0, a.tax - m.totalWithheld));
+    return { available: true, month: target, tax: tax, source: 'estimate', baseMonth: last + 1 };
+  }
+
+  return {
+    BASIC_MONTHLY: BASIC_MONTHLY,
+    ANNUAL_BRACKETS: ANNUAL_BRACKETS,
+    MONTHLY_BRACKETS: MONTHLY_BRACKETS,
+    round2: round2,
+    annualTaxOf: annualTaxOf,
+    bonusSeparateTax: bonusSeparateTax,
+    bonusBlindZones: bonusBlindZones,
+    inBonusBlindZone: inBonusBlindZone,
+    computeMonthly: computeMonthly,
+    computeAnnual: computeAnnual,
+    medicalDeductible: medicalDeductible,
+    predictNextMonth: predictNextMonth
+  };
+})();
+if (typeof module !== 'undefined' && module.exports) module.exports = TaxEngine;
+/*__ENGINE_END__*/
+
+/* ══════════════ UI 层 ══════════════ */
+(function () {
+  'use strict';
+  var E = TaxEngine;
+  var $ = function (s) { return document.querySelector(s); };
+  var now = new Date();
+  var REAL_YEAR = now.getFullYear();
+  var REAL_MONTH = now.getMonth() + 1;
+
+  var STORE_PREFIX = 'taxcalc:';
+
+  function emptyMonth() { return { salary: '', ins: '', note: '' }; }
+  function defaultDed() {
+    return {
+      children: { count: 0, start: 1, end: 12, declared: true },
+      infant: { count: 0, start: 1, end: 12, declared: true },
+      elderly: { mode: 'off', share: 1500, start: 1, end: 12, declared: true },
+      mortgage: { on: false, start: 1, end: 12, declared: true },
+      rent: { amount: 0, start: 1, end: 12, declared: true },
+      eduDegree: { on: false, start: 1, end: 12, declared: true },
+      eduCert: { on: false, month: 1 },
+      customs: []
+    };
+  }
+  function mergeDed(d) {
+    var base = defaultDed();
+    if (!d || typeof d !== 'object') return base;
+    ['children', 'infant', 'elderly', 'mortgage', 'rent', 'eduDegree', 'eduCert'].forEach(function (k) {
+      if (d[k] && typeof d[k] === 'object') {
+        Object.keys(base[k]).forEach(function (f) {
+          if (d[k][f] !== undefined) base[k][f] = d[k][f];
+        });
+      }
+    });
+    if (Array.isArray(d.customs)) {
+      base.customs = d.customs.slice(0, 5).map(function (c) {
+        return {
+          name: String(c.name || '').slice(0, 30),
+          amount: Math.max(0, Number(c.amount) || 0),
+          start: Math.min(12, Math.max(1, parseInt(c.start, 10) || 1)),
+          end: Math.min(12, Math.max(1, parseInt(c.end, 10) || 12)),
+          declared: c.declared !== false
+        };
+      });
+    }
+    return base;
+  }
+  function freshState(year) {
+    return {
+      year: year, version: 2,
+      months: (function () { var a = []; for (var i = 0; i < 12; i++) a.push(emptyMonth()); return a; })(),
+      ded: defaultDed(),
+      bonusAmount: '', bonusMonth: 1, bonusMode: 'auto', bonusWithheld: '', medical: '', other: ''
+    };
+  }
+
+  var state = freshState(REAL_YEAR);
+
+  function fmt(v, dp) {
+    if (dp === undefined) dp = 2;
+    return Number(v).toLocaleString('zh-CN', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+  }
+  function fmtAxis(v) {
+    if (v >= 10000) { var w = v / 10000; return (w % 1 ? w.toFixed(1) : w) + '万'; }
+    return String(v);
+  }
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
+  /* ── 持久化 ── */
+  function saveState() {
+    try { localStorage.setItem(STORE_PREFIX + state.year, JSON.stringify(state)); } catch (e) { /* 忽略配额错误 */ }
+    scheduleFileWrite();
+  }
+
+  /* ── 自动保存到本地 JSON 文件（File System Access，仅 Chromium 系浏览器） ── */
+  var fileHandle = null, pendingHandle = null, fileWriteTimer = null, serverSave = null;
+  var FILE_SUPPORTED = typeof window.showSaveFilePicker === 'function';
+
+  function idbOpen() {
+    return new Promise(function (res, rej) {
+      var req = indexedDB.open('taxcalc', 1);
+      req.onupgradeneeded = function () { req.result.createObjectStore('kv'); };
+      req.onsuccess = function () { res(req.result); };
+      req.onerror = function () { rej(req.error); };
+    });
+  }
+  function idbSet(k, v) {
+    return idbOpen().then(function (db) {
+      return new Promise(function (res, rej) {
+        var tx = db.transaction('kv', 'readwrite');
+        tx.objectStore('kv').put(v, k);
+        tx.oncomplete = function () { res(); };
+        tx.onerror = function () { rej(tx.error); };
+      });
+    });
+  }
+  function idbGet(k) {
+    return idbOpen().then(function (db) {
+      return new Promise(function (res, rej) {
+        var rq = db.transaction('kv', 'readonly').objectStore('kv').get(k);
+        rq.onsuccess = function () { res(rq.result); };
+        rq.onerror = function () { rej(rq.error); };
+      });
+    });
+  }
+
+  function buildDump() {
+    var years = {};
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (k.indexOf(STORE_PREFIX) === 0 && k !== STORE_PREFIX + 'ui') {
+        try { years[k.slice(STORE_PREFIX.length)] = JSON.parse(localStorage.getItem(k)); } catch (e) {}
+      }
+    }
+    return { app: 'tax-calculator', version: 2, exportedAt: new Date().toISOString(), years: years };
+  }
+  function scheduleFileWrite() {
+    if (!fileHandle && !serverSave) return;
+    if (fileWriteTimer) clearTimeout(fileWriteTimer);
+    fileWriteTimer = setTimeout(writeAllData, 800);
+  }
+  function writeAllData() {
+    if (serverSave) {
+      return fetch('api/save', { method: 'POST', body: JSON.stringify(buildDump()) })
+        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); })
+        .catch(function (e) {
+          serverSave = null;
+          updateFileBtn();
+        });
+    }
+    return writeBoundFile();
+  }
+  function writeBoundFile() {
+    if (!fileHandle) return;
+    return fileHandle.createWritable().then(function (w) {
+      return w.write(JSON.stringify(buildDump(), null, 2)).then(function () { return w.close(); });
+    }).catch(function (e) {
+      fileHandle = null;
+      updateFileBtn();
+      alert('自动保存到文件已暂停（文件可能被移动、删除或正被其他程序占用）：' + (e && e.message || e));
+    });
+  }
+  function detectServerSave() {
+    // 通过本地配套服务（serve.cjs）打开时，可零点击自动写 index.html 同目录的 个税数据.json
+    if (!/^(http|https):$/.test(location.protocol)) { updateFileBtn(); return; }
+    fetch('api/ping').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      if (j && j.ok) {
+        serverSave = j;
+        updateFileBtn();
+        scheduleFileWrite();
+      }
+    }).catch(function () {});
+  }
+  function updateFileBtn() {
+    var btn = $('#btnFile');
+    if (serverSave) {
+      btn.style.display = '';
+      btn.textContent = '已自动保存 ✓';
+      btn.title = '已通过本地服务自动写入 index.html 同目录的「个税数据.json」（' + (serverSave.file || '') + '），无需任何操作';
+      return;
+    }
+    if (!FILE_SUPPORTED) { btn.style.display = 'none'; return; }
+    btn.style.display = '';
+    if (fileHandle) {
+      btn.textContent = '已自动保存到文件 ✓';
+      btn.title = '数据变更时自动写入绑定的 JSON 文件；点击解除绑定';
+    } else if (pendingHandle) {
+      btn.textContent = '继续自动保存到文件';
+      btn.title = '重新授权之前绑定的 JSON 文件';
+    } else {
+      btn.textContent = '自动保存到文件';
+      btn.title = '绑定一个本地 JSON 文件，此后数据变更自动写入该文件';
+    }
+  }
+  function bindOrUnbindFile() {
+    if (serverSave) {
+      alert('当前通过本地服务打开，已自动保存到 index.html 同目录的「个税数据.json」，无需绑定文件。\n\n若想直接双击 HTML 使用，可运行目录下的 serve 停止后照常使用浏览器本地保存，或用「自动保存到文件」绑定任意位置的 JSON 文件。');
+      return;
+    }
+    if (fileHandle) {
+      if (!confirm('解除文件自动保存？（浏览器本地自动保存不受影响）')) return;
+      fileHandle = null; pendingHandle = null;
+      idbSet('fileHandle', undefined).catch(function () {});
+      updateFileBtn();
+      return;
+    }
+    var p;
+    if (pendingHandle) {
+      p = pendingHandle.requestPermission({ mode: 'readwrite' }).then(function (perm) {
+        if (perm !== 'granted') throw { message: '未获得文件写入权限' };
+        return pendingHandle;
+      });
+    } else {
+      p = window.showSaveFilePicker({
+        suggestedName: '个税数据.json',
+        types: [{ description: 'JSON 文件', accept: { 'application/json': ['.json'] } }]
+      });
+    }
+    p.then(function (h) {
+      fileHandle = h; pendingHandle = null;
+      updateFileBtn();
+      return idbSet('fileHandle', h);
+    }).then(function () {
+      writeBoundFile();
+    }).catch(function (e) {
+      if (e && e.name === 'AbortError') return; // 用户取消了文件选择
+      updateFileBtn();
+      alert('绑定失败：' + (e && e.message || e));
+    });
+  }
+  function restoreFileBinding() {
+    if (!FILE_SUPPORTED) { updateFileBtn(); return; }
+    idbGet('fileHandle').then(function (h) {
+      if (!h) { updateFileBtn(); return; }
+      return h.queryPermission({ mode: 'readwrite' }).then(function (perm) {
+        if (perm === 'granted') { fileHandle = h; scheduleFileWrite(); }
+        else pendingHandle = h;
+        updateFileBtn();
+      });
+    }).catch(function () { updateFileBtn(); });
+  }
+  function loadState(year) {
+    var s = null;
+    try { s = JSON.parse(localStorage.getItem(STORE_PREFIX + year) || 'null'); } catch (e) { s = null; }
+    state = freshState(year);
+    if (s && Array.isArray(s.months)) {
+      state.bonusAmount = s.bonusAmount || '';
+      state.bonusMonth = s.bonusMonth || 1;
+      state.bonusMode = s.bonusMode || 'auto';
+      state.bonusWithheld = s.bonusWithheld || '';
+      state.medical = s.medical || '';
+      state.other = s.other || '';
+      for (var i = 0; i < 12; i++) {
+        var m = s.months[i] || {};
+        state.months[i] = {
+          salary: m.salary == null ? '' : String(m.salary),
+          ins: m.ins == null ? '' : String(m.ins),
+          note: m.note || ''
+        };
+      }
+      if (s.ded) {
+        state.ded = mergeDed(s.ded);
+      } else {
+        // v1 → v2 迁移：旧版在月度表手填的「专项附加扣除」转为一个已申报的自定义项
+        var maxDed = 0;
+        s.months.forEach(function (m) {
+          var d = parseFloat(m && m.ded) || 0;
+          if (d > maxDed) maxDed = d;
+        });
+        if (maxDed > 0) {
+          state.ded.customs = [{ name: '原月度表录入的专项附加', amount: maxDed, start: 1, declared: true }];
+        }
+      }
+    }
+  }
+
+  /* ── DOM 构建 ── */
+  function buildYearSelect() {
+    var sel = $('#yearSelect');
+    sel.innerHTML = '';
+    // 现行个税规则（起征点 5,000、累计预扣法）自 2019 年起一致，下限固定 2019，上限随系统日期
+    for (var y = 2019; y <= REAL_YEAR + 1; y++) {
+      var o = document.createElement('option');
+      o.value = y; o.textContent = y + ' 年度';
+      if (y === state.year) o.selected = true;
+      sel.appendChild(o);
+    }
+  }
+  function buildBonusMonthSelect() {
+    var sel = $('#bonusMonth');
+    sel.innerHTML = '';
+    for (var i = 1; i <= 12; i++) {
+      var o = document.createElement('option');
+      o.value = i; o.textContent = i + ' 月';
+      if (i === state.bonusMonth) o.selected = true;
+      sel.appendChild(o);
+    }
+  }
+  function buildMonthTable() {
+    var tb = $('#monthTable tbody');
+    tb.innerHTML = '';
+    for (var i = 1; i <= 12; i++) {
+      var tr = document.createElement('tr');
+      tr.dataset.month = i;
+      tr.innerHTML =
+        '<td class="month-cell">' + i + '月' + (i > 1 ? ' <button class="copy-prev" data-idx="' + (i - 1) + '" title="复制上一月数据">⧉</button>' : '') + '</td>' +
+        '<td><input type="number" min="0" step="0.01" data-idx="' + (i - 1) + '" data-field="salary" placeholder="0"></td>' +
+        '<td><input type="number" min="0" step="0.01" data-idx="' + (i - 1) + '" data-field="ins" placeholder="0"></td>' +
+        '<td class="c-cum">—</td>' +
+        '<td class="c-tax">—</td>' +
+        '<td class="c-net">—</td>' +
+        '<td><input type="text" data-idx="' + (i - 1) + '" data-field="note" placeholder="如：涨薪 / 年中入职"></td>';
+      tb.appendChild(tr);
+    }
+  }
+  function monthOptions(sel) {
+    var h = '';
+    for (var i = 1; i <= 12; i++) h += '<option value="' + i + '"' + (i === sel ? ' selected' : '') + '>' + i + ' 月</option>';
+    return h;
+  }
+
+  function buildDedUI() {
+    var cnt = function (id) {
+      var h = '';
+      for (var i = 0; i <= 5; i++) h += '<option value="' + i + '">' + i + '</option>';
+      $(id).innerHTML = h;
+    };
+    cnt('#dChildren'); cnt('#dInfant');
+    $('#dCertMonth').innerHTML = monthOptions(1);
+    var mths = document.querySelectorAll('#dedTable select.dmth');
+    for (var i = 0; i < mths.length; i++) mths[i].innerHTML = monthOptions(mths[i].dataset.f === 'end' ? 12 : 1);
+  }
+
+  function syncDedUI() {
+    var d = state.ded;
+    $('#dChildren').value = String(d.children.count);
+    $('#dInfant').value = String(d.infant.count);
+    $('#dElderlyMode').value = d.elderly.mode;
+    $('#dElderlyShare').value = d.elderly.share;
+    $('#dMortgage').value = d.mortgage.on ? '1' : '0';
+    $('#dRent').value = String(d.rent.amount);
+    $('#dEduDegree').value = d.eduDegree.on ? '1' : '0';
+    $('#dEduCert').value = d.eduCert.on ? '1' : '0';
+    $('#dCertMonth').innerHTML = monthOptions(d.eduCert.month);
+    var mths = document.querySelectorAll('#dedTable select.dmth');
+    for (var i = 0; i < mths.length; i++) {
+      var v = d[mths[i].dataset.k][mths[i].dataset.f] || (mths[i].dataset.f === 'end' ? 12 : 1);
+      mths[i].value = String(v);
+    }
+    var decs = document.querySelectorAll('#dedTable input.ddec');
+    for (var k = 0; k < decs.length; k++) decs[k].checked = d[decs[k].dataset.k].declared !== false;
+    buildCustomRows();
+  }
+
+  function buildCustomRows() {
+    var host = $('#customRows');
+    host.innerHTML = '';
+    (state.ded.customs || []).forEach(function (c, i) {
+      var div = document.createElement('div');
+      div.className = 'custom-row';
+      div.innerHTML = '自定义 <input type="text" data-ci="' + i + '" data-cf="name" placeholder="项目名称（如：分摊赡养）" value="' + esc(c.name) + '">' +
+        ' <input type="number" min="0" step="0.01" data-ci="' + i + '" data-cf="amount" value="' + esc(c.amount) + '"> 元/月' +
+        ' <select data-ci="' + i + '" data-cf="start">' + monthOptions(c.start) + '</select> — <select data-ci="' + i + '" data-cf="end">' + monthOptions(c.end) + '</select>' +
+        ' <label><input type="checkbox" data-ci="' + i + '" data-cf="declared"' + (c.declared ? ' checked' : '') + '>已申报</label>' +
+        ' <button class="btn btn-danger" data-ci="' + i + '" data-cf="remove" title="删除该项">✕</button>';
+      host.appendChild(div);
+    });
+  }
+
+  function syncInputsFromState() {
+    var inputs = document.querySelectorAll('#monthTable input');
+    for (var k = 0; k < inputs.length; k++) {
+      var el = inputs[k];
+      el.value = state.months[+el.dataset.idx][el.dataset.field];
+    }
+    $('#bonusAmount').value = state.bonusAmount;
+    buildBonusMonthSelect();
+    $('#bonusMonth').value = state.bonusMonth;
+    $('#bonusWithheld').value = state.bonusWithheld;
+    var radios = document.querySelectorAll('#bonusMode input');
+    for (var r = 0; r < radios.length; r++) radios[r].checked = (radios[r].value === state.bonusMode);
+    $('#medical').value = state.medical;
+    $('#other').value = state.other;
+    syncDedUI();
+    buildYearSelect();
+  }
+
+  /* ── 专项附加扣除推导 ── */
+  function dedMonthlyItems() {
+    var d = state.ded, out = [];
+    var push = function (cfg) {
+      var st = Math.min(12, Math.max(1, cfg.start || 1));
+      var en = Math.min(12, Math.max(1, cfg.end || 12));
+      if (en < st) en = st;
+      if (!(cfg.amt > 0)) return;
+      out.push({ amt: cfg.amt, start: st, end: en, declared: cfg.declared });
+    };
+    push({ amt: 2000 * d.children.count, start: d.children.start, end: d.children.end, declared: d.children.declared });
+    push({ amt: 2000 * d.infant.count, start: d.infant.start, end: d.infant.end, declared: d.infant.declared });
+    push({ amt: d.elderly.mode === 'only' ? 3000 : d.elderly.mode === 'share' ? Math.min(1500, d.elderly.share) : 0, start: d.elderly.start, end: d.elderly.end, declared: d.elderly.declared });
+    push({ amt: d.mortgage.on ? 1000 : 0, start: d.mortgage.start, end: d.mortgage.end, declared: d.mortgage.declared });
+    push({ amt: d.rent.amount, start: d.rent.start, end: d.rent.end, declared: d.rent.declared });
+    push({ amt: d.eduDegree.on ? 400 : 0, start: d.eduDegree.start, end: d.eduDegree.end, declared: d.eduDegree.declared });
+    (d.customs || []).forEach(function (c) {
+      push({ amt: c.amount, start: c.start, end: c.end, declared: c.declared });
+    });
+    return out;
+  }
+  function perMonthDed() {
+    var arr = new Array(12).fill(0);
+    dedMonthlyItems().forEach(function (it) {
+      if (!it.declared) return;
+      for (var m = it.start; m <= it.end; m++) arr[m - 1] += it.amt;
+    });
+    return arr;
+  }
+  function annualDeclaredDed() {
+    var a = perMonthDed();
+    return round2c(a.reduce(function (x, y) { return x + y; }, 0));
+  }
+  function annualOnlyDed() {
+    var s = 0;
+    dedMonthlyItems().forEach(function (it) {
+      if (!it.declared) s += it.amt * (it.end - it.start + 1);
+    });
+    if (state.ded.eduCert.on) s += 3600;
+    return round2c(s);
+  }
+
+  /* ── 读取数值 ── */
+  function monthsAsNumbers() {
+    var dedArr = perMonthDed();
+    return state.months.map(function (m, i) {
+      var salary = parseFloat(m.salary) || 0;
+      var ins = parseFloat(m.ins) || 0;
+      return { salary: salary, ins: ins, ded: (salary > 0 || ins > 0) ? dedArr[i] : 0 };
+    });
+  }
+
+  /* ── 渲染 ── */
+  function renderRows(rows) {
+    var tb = $('#monthTable tbody');
+    for (var i = 0; i < 12; i++) {
+      var tr = tb.children[i];
+      var r = rows[i];
+      tr.classList.toggle('empty', !r.filled);
+      tr.classList.toggle('now', state.year === REAL_YEAR && r.month === REAL_MONTH);
+      tr.querySelector('.c-cum').textContent = r.filled ? fmt(r.cumTaxable) : '—';
+      tr.querySelector('.c-tax').textContent = r.filled ? fmt(r.monthTax) : '—';
+      tr.querySelector('.c-net').textContent = r.filled ? fmt(r.takeHome) : '—';
+    }
+  }
+
+  function renderCards(annual, pred) {
+    $('#cardGross').innerHTML = fmt(annual.grossIncome) + '<small> 元</small>';
+    $('#cardGrossNote').textContent = '工资 ' + fmt(annual.monthly.totalSalary, 0) + (annual.bonus > 0 ? ' ＋ 年终奖 ' + fmt(annual.bonus, 0) : '');
+    $('#cardNet').innerHTML = fmt(annual.netIncome) + '<small> 元</small>';
+    $('#cardWithheld').innerHTML = fmt(annual.totalPrepaid) + '<small> 元</small>';
+    $('#cardWithheldNote').textContent = '已填 ' + annual.monthly.filledCount + ' 个月'
+      + (annual.bonusWithheld > 0 ? ' · 工资 ' + fmt(annual.monthly.totalWithheld, 0) + ' ＋ 奖金 ' + fmt(annual.bonusWithheld, 0) : '');
+
+    var settleEl = $('#cardSettle'), noteEl = $('#cardSettleNote');
+    settleEl.className = 'v';
+    if (annual.monthly.filledCount === 0) {
+      settleEl.textContent = '—';
+      noteEl.textContent = '请先录入月度数据';
+    } else if (annual.settle > 0) {
+      settleEl.classList.add('red');
+      settleEl.innerHTML = '+' + fmt(annual.settle) + '<small> 元</small>';
+      noteEl.textContent = '汇算需补税';
+    } else if (annual.settle < 0) {
+      settleEl.classList.add('green');
+      settleEl.innerHTML = '−' + fmt(-annual.settle) + '<small> 元</small>';
+      noteEl.textContent = '汇算可退税';
+    } else {
+      settleEl.textContent = '0 元';
+      noteEl.textContent = '预缴与年度应纳一致';
+    }
+
+    var nextEl = $('#cardNext'), nextNote = $('#cardNextNote');
+    nextEl.className = 'v';
+    if (state.year !== REAL_YEAR) {
+      nextEl.textContent = '—';
+      nextNote.textContent = '仅对当前年度提供预测';
+    } else if (!pred.available) {
+      nextEl.textContent = '—';
+      nextNote.textContent = pred.reason === 'noData' ? '请先录入月度数据' : '本年度已进入 12 月，次年 1 月起重新累计';
+    } else {
+      nextEl.innerHTML = fmt(pred.tax) + '<small> 元</small>';
+      nextNote.textContent = pred.month + ' 月'
+        + (pred.source === 'filled' ? '（已按录入数据计算）' : '（按 ' + pred.baseMonth + ' 月数据估算，可用「填充」生成）');
+    }
+
+    $('#cardRate').textContent = annual.grossIncome > 0 ? (annual.taxRate * 100).toFixed(2) + '%' : '—';
+  }
+
+  function renderBonus(annual) {
+    var box = $('#bonusResult');
+    if (!(annual.bonus > 0)) {
+      box.innerHTML = '<h3>方案对比</h3><div class="chart-empty">未录入年终奖，无需对比</div>';
+      return;
+    }
+    var sep = annual.separate, com = annual.combined;
+    var chosenIsSep = annual.chosenMode === 'separate';
+    var cheaperIsSep = sep.total <= com.total;
+    var diff = Math.abs(round2c(sep.total - com.total));
+    var html = '<h3>年度汇算口径 · 两方案对比</h3>' +
+      '<table class="cmp"><thead><tr><th>方案</th><th>应纳税所得额</th><th>综合所得税额</th><th>奖金税额</th><th>合计税额</th></tr></thead><tbody>' +
+      '<tr class="' + (chosenIsSep ? 'chosen' : '') + '"><td>单独计税' + (chosenIsSep ? '<span class="badge">' + (annual.requestedMode === 'auto' ? '自动推荐' : '已选') + '</span>' : '') + '</td>' +
+      '<td>' + fmt(sep.taxable) + '</td><td>' + fmt(sep.tax) + '</td><td>' + fmt(sep.bonusTax) + '</td><td><b>' + fmt(sep.total) + '</b></td></tr>' +
+      '<tr class="' + (!chosenIsSep ? 'chosen' : '') + '"><td>并入综合所得' + (!chosenIsSep ? '<span class="badge">' + (annual.requestedMode === 'auto' ? '自动推荐' : '已选') + '</span>' : '') + '</td>' +
+      '<td>' + fmt(com.taxable) + '</td><td>' + fmt(com.tax) + '</td><td>—</td><td><b>' + fmt(com.total) + '</b></td></tr>' +
+      '</tbody></table>';
+    if (diff <= 0.005) {
+      html += '<p class="save-line" style="color:var(--muted);font-weight:400">两种方式税额相同</p>';
+    } else if (annual.requestedMode === 'auto') {
+      html += '<p class="save-line">' + (cheaperIsSep ? '单独计税' : '并入综合所得') + '更省，少缴 ' + fmt(diff) + ' 元</p>';
+    } else if (chosenIsSep === cheaperIsSep) {
+      html += '<p class="save-line">' + (chosenIsSep ? '单独计税' : '并入综合所得') + '比另一种方式少缴 ' + fmt(diff) + ' 元</p>';
+    } else {
+      html += '<div class="warn">⚠ 当前锁定的「' + (chosenIsSep ? '单独计税' : '并入综合所得') + '」比另一种方式<b>多缴 ' + fmt(diff) + ' 元</b>；如无特殊考虑，建议改选「' + (cheaperIsSep ? '单独计税' : '并入综合所得') + '」。</div>';
+    }
+    var zone = E.inBonusBlindZone(annual.bonus);
+    if (zone && (annual.chosenMode === 'separate')) {
+      html += '<div class="warn">⚠ 奖金处于「多发少得」盲区（' + fmt(zone.from, 0) + ' ~ ' + fmt(zone.to) + '）：在此区间内多发一元奖金，到手反而变少。建议将奖金调整为 ' + fmt(zone.from, 0) + ' 元或越过 ' + fmt(zone.to) + ' 元。</div>';
+    }
+    box.innerHTML = html;
+  }
+
+  function round2c(v) { return Math.round((v + Number.EPSILON) * 100) / 100; }
+
+  function renderAnnual(annual) {
+    var box = $('#annualResult');
+    if (annual.monthly.filledCount === 0) {
+      box.innerHTML = '<h3>汇算结果</h3><div class="chart-empty">请先在上方录入月度数据</div>';
+      return;
+    }
+    var m = annual.monthly;
+    var sep = annual.chosenMode === 'separate';
+    var settleHtml;
+    if (annual.settle > 0) settleHtml = '<span style="color:var(--red)">需补税 ' + fmt(annual.settle) + ' 元</span>';
+    else if (annual.settle < 0) settleHtml = '<span style="color:var(--green)">可退税 ' + fmt(-annual.settle) + ' 元</span>';
+    else settleHtml = '无需补退';
+
+    var html = '<h3>汇算结果（' + state.year + ' 年度）</h3><table class="kv">' +
+      '<tr><td>全年综合所得收入' + (annual.bonus > 0 ? '（奖金' + (sep ? '单独计税，不计入' : '已并入') + '）' : '') + '</td><td>' + fmt(m.totalSalary) + '</td></tr>' +
+      '<tr><td>基本减除费用</td><td>60,000.00</td></tr>' +
+      '<tr><td>全年五险一金</td><td>' + fmt(m.totalIns) + '</td></tr>' +
+      '<tr><td>全年专项附加扣除' + (annual.extraDeduction > 0 ? '<br><span style="color:var(--muted);font-weight:400;font-size:12px">已申报 ' + fmt(annual.annualDeduction) + ' ＋ 仅汇算补充 ' + fmt(annual.extraDeduction) + '</span>' : '') + '</td><td>' + fmt(annual.annualDeduction + annual.extraDeduction) + '</td></tr>' +
+      (annual.medicalDeductible > 0 ? '<tr><td>大病医疗扣除</td><td>' + fmt(annual.medicalDeductible) + '</td></tr>' : '') +
+      (annual.other > 0 ? '<tr><td>其他扣除</td><td>' + fmt(annual.other) + '</td></tr>' : '') +
+      '<tr><td>年度应纳税所得额</td><td>' + fmt(sep ? annual.separate.taxable : annual.combined.taxable) + '</td></tr>' +
+      '<tr><td>年度应纳税额' + (sep && annual.bonus > 0 ? '（综合 ' + fmt(annual.separate.tax) + ' ＋ 奖金 ' + fmt(annual.separate.bonusTax) + '）' : '') + '</td><td>' + fmt(annual.finalTax) + '</td></tr>' +
+      '<tr><td>减：全年已预缴' + (annual.bonusWithheld > 0 ? '<br><span style="color:var(--muted);font-weight:400;font-size:12px">工资 ' + fmt(annual.monthly.totalWithheld) + ' ＋ 奖金已预扣 ' + fmt(annual.bonusWithheld) + '</span>' : '') + '</td><td>' + fmt(annual.totalPrepaid) + '</td></tr>' +
+      '<tr class="big"><td>汇算清缴</td><td>' + settleHtml + '</td></tr>' +
+      '</table>';
+    if (annual.tips.length) {
+      html += '<ul class="tips">' + annual.tips.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('') + '</ul>';
+    }
+    box.innerHTML = html;
+  }
+
+  function renderChart(rows) {
+    var host = $('#chart');
+    var filled = rows.filter(function (r) { return r.filled; });
+    if (!filled.length) {
+      host.innerHTML = '<div class="chart-empty">暂无数据，请先录入月度收入</div>';
+      return;
+    }
+    var W = 1120, H = 300, L = 64, R = 14, T = 14, B = 34;
+    var innerW = W - L - R, innerH = H - T - B;
+    var maxV = 0;
+    for (var i = 0; i < filled.length; i++) maxV = Math.max(maxV, filled[i].salary);
+    var niceMax = niceCeil(maxV);
+    var slot = innerW / 12, bw = Math.min(slot * 0.56, 46);
+
+    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" role="img">';
+    for (var g = 0; g <= 5; g++) {
+      var gy = T + innerH - innerH * g / 5;
+      var gv = niceMax * g / 5;
+      s += '<line x1="' + L + '" y1="' + gy + '" x2="' + (W - R) + '" y2="' + gy + '" stroke="#eef1f5" stroke-width="1"/>';
+      s += '<text x="' + (L - 8) + '" y="' + (gy + 4) + '" text-anchor="end" font-size="11" fill="#9ca3af">' + fmtAxis(gv) + '</text>';
+    }
+    for (var m = 0; m < 12; m++) {
+      var r = rows[m];
+      var cx = L + slot * m + slot / 2;
+      s += '<text x="' + cx + '" y="' + (H - 12) + '" text-anchor="middle" font-size="11" fill="' + (r.filled ? '#6b7280' : '#cbd5e1') + '">' + r.month + '月</text>';
+      if (!r.filled) continue;
+      var segs = [
+        { v: r.takeHome, c: '#10b981' },
+        { v: r.ins, c: '#94a3b8' },
+        { v: r.monthTax, c: '#ef4444' }
+      ];
+      var yBase = T + innerH, tip = m + '月｜工资 ' + fmt(r.salary) + '｜五险一金 ' + fmt(r.ins) + '｜个税 ' + fmt(r.monthTax) + '｜到手 ' + fmt(r.takeHome);
+      s += '<g><title>' + tip + '</title>';
+      for (var k = 0; k < segs.length; k++) {
+        if (!(segs[k].v > 0)) continue;
+        var h = innerH * segs[k].v / niceMax;
+        s += '<rect x="' + (cx - bw / 2) + '" y="' + (yBase - h) + '" width="' + bw + '" height="' + Math.max(h, 1) + '" fill="' + segs[k].c + '" rx="2"/>';
+        yBase -= h;
+      }
+      s += '</g>';
+    }
+    s += '</svg>';
+    host.innerHTML = s;
+  }
+
+  function niceCeil(v) {
+    if (v <= 0) return 60000;
+    var mag = Math.pow(10, Math.floor(Math.log10(v)));
+    var n = v / mag;
+    var nice = n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 4 ? 4 : n <= 5 ? 5 : n <= 8 ? 8 : 10;
+    return nice * mag;
+  }
+
+  function renderPie(annual) {
+    var host = $('#pieChart');
+    if (annual.monthly.filledCount === 0) { host.innerHTML = '<div class="chart-empty">暂无数据，请先录入月度收入</div>'; return; }
+    var items = [
+      { label: '到手', v: annual.netIncome, c: '#10b981' },
+      { label: '五险一金（个人）', v: annual.monthly.totalIns, c: '#94a3b8' },
+      { label: '全年个税', v: annual.finalTax, c: '#ef4444' }
+    ];
+    var total = 0;
+    items.forEach(function (it) { total += Math.max(0, it.v); });
+    if (total <= 0) { host.innerHTML = '<div class="chart-empty">暂无数据</div>'; return; }
+    var cx = 115, cy = 115, rOut = 92, rIn = 56, a0 = -Math.PI / 2, shapes = '';
+    items.forEach(function (it) {
+      var v = Math.max(0, it.v);
+      if (v <= 0) return;
+      var pct = v / total;
+      var pctText = (pct * 100).toFixed(1) + '%';
+      var title = '<title>' + it.label + ' ' + fmt(v) + ' 元（' + pctText + '）</title>';
+      if (pct >= 0.999) {
+        shapes += '<circle cx="' + cx + '" cy="' + cy + '" r="' + rOut + '" fill="' + it.c + '">' + title + '</circle>' +
+          '<circle cx="' + cx + '" cy="' + cy + '" r="' + rIn + '" fill="#fff"/>' +
+          '<text x="' + cx + '" y="' + (cy - 7) + '" text-anchor="middle" font-size="11" fill="#fff">100%</text>';
+        return;
+      }
+      var a1 = a0 + pct * Math.PI * 2;
+      var mid = (a0 + a1) / 2;
+      var large = (a1 - a0) > Math.PI ? 1 : 0;
+      var pt = function (r, a) { return (cx + r * Math.cos(a)).toFixed(2) + ',' + (cy + r * Math.sin(a)).toFixed(2); };
+      shapes += '<path d="M ' + pt(rOut, a0) + ' A ' + rOut + ' ' + rOut + ' 0 ' + large + ' 1 ' + pt(rOut, a1) +
+        ' L ' + pt(rIn, a1) + ' A ' + rIn + ' ' + rIn + ' 0 ' + large + ' 0 ' + pt(rIn, a0) + ' Z" fill="' + it.c + '" stroke="#fff" stroke-width="2">' + title + '</path>';
+      if (pct >= 0.06) {
+        var lr = (rOut + rIn) / 2;
+        shapes += '<text x="' + (cx + lr * Math.cos(mid)).toFixed(1) + '" y="' + (cy + lr * Math.sin(mid) + 4).toFixed(1) + '" text-anchor="middle" font-size="12" font-weight="600" fill="#fff">' + pctText + '</text>';
+      } else {
+        var ax = cx + (rOut + 3) * Math.cos(mid), ay = cy + (rOut + 3) * Math.sin(mid);
+        var bx = cx + (rOut + 15) * Math.cos(mid), by = cy + (rOut + 15) * Math.sin(mid);
+        var right = Math.cos(mid) >= 0;
+        shapes += '<line x1="' + ax.toFixed(1) + '" y1="' + ay.toFixed(1) + '" x2="' + bx.toFixed(1) + '" y2="' + by.toFixed(1) + '" stroke="' + it.c + '" stroke-width="1.5"/>' +
+          '<text x="' + (bx + (right ? 5 : -5)).toFixed(1) + '" y="' + (by + 4).toFixed(1) + '" text-anchor="' + (right ? 'start' : 'end') + '" font-size="11.5" font-weight="600" fill="#374151">' + pctText + '</text>';
+      }
+      a0 = a1;
+    });
+    shapes += '<text x="' + cx + '" y="' + (cy - 8) + '" text-anchor="middle" font-size="11" fill="#9ca3af">全年税前</text>' +
+      '<text x="' + cx + '" y="' + (cy + 12) + '" text-anchor="middle" font-size="13.5" font-weight="700" fill="#1f2937">' + fmt(total, 0) + '</text>';
+    var legend = '<ul class="pie-legend">' + items.map(function (it) {
+      var v = Math.max(0, it.v);
+      return '<li><span class="dot" style="background:' + it.c + '"></span>' + it.label +
+        '<b>' + fmt(v) + ' 元 · ' + (v / total * 100).toFixed(1) + '%</b></li>';
+    }).join('') + '</ul>';
+    host.innerHTML = '<svg viewBox="-40 0 300 230" style="width:250px;height:192px;flex-shrink:0">' + shapes + '</svg>' + legend;
+  }
+
+  var RATE_COLORS = { 0.03: '#a5b4fc', 0.10: '#818cf8', 0.20: '#6366f1', 0.25: '#4f46e5', 0.30: '#4338ca', 0.35: '#3730a3', 0.45: '#312e81' };
+
+  function renderMonthlyTax(rows) {
+    var host = $('#taxChart');
+    var filled = rows.filter(function (r) { return r.filled; });
+    if (!filled.length) { host.innerHTML = '<div class="chart-empty">暂无数据，请先录入月度收入</div>'; return; }
+    var W = 620, H = 280, L = 56, R = 16, T = 26, B = 30;
+    var innerW = W - L - R, innerH = H - T - B;
+    var maxTax = 0;
+    filled.forEach(function (r) { maxTax = Math.max(maxTax, r.monthTax); });
+    var yMax = niceCeil(Math.max(maxTax, 100));
+    var slot = innerW / 12, bw = Math.min(slot * 0.5, 40);
+    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg">';
+    for (var g = 0; g <= 4; g++) {
+      var gy = T + innerH - innerH * g / 4, gv = yMax * g / 4;
+      s += '<line x1="' + L + '" y1="' + gy.toFixed(1) + '" x2="' + (W - R) + '" y2="' + gy.toFixed(1) + '" stroke="#eef1f5"/>' +
+        '<text x="' + (L - 6) + '" y="' + (gy + 4).toFixed(1) + '" text-anchor="end" font-size="11" fill="#9ca3af">' + fmtAxis(gv) + '</text>';
+    }
+    var prevRate = null;
+    for (var m = 1; m <= 12; m++) {
+      var r = rows[m - 1];
+      var cx = L + slot * (m - 1) + slot / 2;
+      s += '<text x="' + cx.toFixed(1) + '" y="' + (H - 9) + '" text-anchor="middle" font-size="11" fill="' + (r && r.filled ? '#6b7280' : '#cbd5e1') + '">' + m + '月</text>';
+      if (!r || !r.filled) continue;
+      var h = Math.max(innerH * r.monthTax / yMax, 1.5);
+      var color = RATE_COLORS[r.rate] || '#6366f1';
+      var top = T + innerH - h;
+      s += '<rect x="' + (cx - bw / 2).toFixed(1) + '" y="' + top.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + h.toFixed(1) + '" fill="' + color + '" rx="3">' +
+        '<title>' + m + '月 预扣个税 ' + fmt(r.monthTax) + ' 元（当月适用 ' + Math.round(r.rate * 100) + '% 档）</title></rect>';
+      if (r.rate > 0 && r.rate !== prevRate) {
+        s += '<text x="' + cx.toFixed(1) + '" y="' + (top - 7).toFixed(1) + '" text-anchor="middle" font-size="10.5" font-weight="600" fill="#4f46e5">' + Math.round(r.rate * 100) + '%</text>';
+      }
+      prevRate = r.rate;
+    }
+    s += '</svg>';
+    host.innerHTML = s;
+  }
+
+  function renderDed() {
+    var d = state.ded;
+    $('#vChildren').textContent = fmt(2000 * (d.children.count || 0));
+    $('#vInfant').textContent = fmt(2000 * (d.infant.count || 0));
+    $('#vElderly').textContent = fmt(d.elderly.mode === 'only' ? 3000 :
+      d.elderly.mode === 'share' ? Math.min(1500, d.elderly.share || 0) : 0);
+    $('#vMortgage').textContent = fmt(d.mortgage.on ? 1000 : 0);
+    $('#vRent').textContent = fmt(d.rent.amount || 0);
+    $('#vEduDegree').textContent = fmt(d.eduDegree.on ? 400 : 0);
+    $('#dElderlyShare').style.display = d.elderly.mode === 'share' ? '' : 'none';
+  }
+
+  /* ── 主计算 ── */
+  function recompute() {
+    var nums = monthsAsNumbers();
+    var annual = E.computeAnnual(nums, {
+      bonus: parseFloat(state.bonusAmount) || 0,
+      bonusMode: state.bonusMode,
+      bonusWithheld: parseFloat(state.bonusWithheld) || 0,
+      medicalSpent: parseFloat(state.medical) || 0,
+      other: parseFloat(state.other) || 0,
+      annualDeduction: annualDeclaredDed(),
+      extraDeduction: annualOnlyDed()
+    });
+    var pred = E.predictNextMonth(nums, REAL_MONTH);
+    renderDed();
+    renderRows(annual.monthly.rows);
+    renderCards(annual, pred);
+    renderBonus(annual);
+    renderAnnual(annual);
+    renderChart(annual.monthly.rows);
+    renderPie(annual);
+    renderMonthlyTax(annual.monthly.rows);
+    saveState();
+  }
+
+  /* ── 事件 ── */
+  function bindEvents() {
+    $('#monthTable').addEventListener('click', function (e) {
+      var btn = e.target.closest('button.copy-prev');
+      if (!btn) return;
+      var idx = +btn.dataset.idx;
+      var srcIdx = -1;
+      for (var j = idx - 1; j >= 0; j--) {
+        var p = state.months[j];
+        if ((parseFloat(p.salary) || 0) > 0 || (parseFloat(p.ins) || 0) > 0) { srcIdx = j; break; }
+      }
+      if (srcIdx < 0) { alert('上方没有可复制的月份数据。'); return; }
+      var src = state.months[srcIdx];
+      state.months[idx].salary = src.salary;
+      state.months[idx].ins = src.ins;
+      document.querySelector('#monthTable input[data-idx="' + idx + '"][data-field="salary"]').value = src.salary;
+      document.querySelector('#monthTable input[data-idx="' + idx + '"][data-field="ins"]').value = src.ins;
+      recompute();
+    });
+
+    $('#monthTable').addEventListener('input', function (e) {
+      var el = e.target;
+      if (!el.dataset || el.dataset.idx === undefined) return;
+      state.months[+el.dataset.idx][el.dataset.field] = el.value;
+      recompute();
+    });
+
+    /* ── 专项附加扣除区 ── */
+    $('#dedTable').addEventListener('change', function (e) {
+      var el = e.target, d = state.ded, id = el.id;
+      if (id === 'dChildren') d.children.count = +el.value;
+      else if (id === 'dInfant') d.infant.count = +el.value;
+      else if (id === 'dElderlyMode') d.elderly.mode = el.value;
+      else if (id === 'dMortgage') {
+        d.mortgage.on = el.value === '1';
+        if (d.mortgage.on && d.rent.amount > 0) { d.rent.amount = 0; syncDedUI(); }
+      }
+      else if (id === 'dRent') {
+        d.rent.amount = +el.value;
+        if (d.rent.amount > 0 && d.mortgage.on) { d.mortgage.on = false; syncDedUI(); }
+      }
+      else if (id === 'dEduDegree') d.eduDegree.on = el.value === '1';
+      else if (id === 'dEduCert') d.eduCert.on = el.value === '1';
+      else if (id === 'dCertMonth') d.eduCert.month = +el.value;
+      else if (el.classList.contains('dmth')) d[el.dataset.k][el.dataset.f] = +el.value;
+      else if (el.classList.contains('ddec')) d[el.dataset.k].declared = el.checked;
+      else return;
+      recompute();
+    });
+    $('#dElderlyShare').addEventListener('input', function (e) {
+      state.ded.elderly.share = Math.max(0, parseFloat(e.target.value) || 0);
+      recompute();
+    });
+
+    $('#customRows').addEventListener('input', function (e) {
+      var el = e.target;
+      if (el.dataset.ci === undefined) return;
+      var c = state.ded.customs[+el.dataset.ci];
+      if (!c) return;
+      if (el.dataset.cf === 'name') c.name = el.value;
+      else if (el.dataset.cf === 'amount') c.amount = Math.max(0, parseFloat(el.value) || 0);
+      recompute();
+    });
+    $('#customRows').addEventListener('change', function (e) {
+      var el = e.target;
+      if (el.dataset.ci === undefined) return;
+      var c = state.ded.customs[+el.dataset.ci];
+      if (!c) return;
+      if (el.dataset.cf === 'start') c.start = +el.value;
+      else if (el.dataset.cf === 'end') c.end = +el.value;
+      else if (el.dataset.cf === 'declared') c.declared = el.checked;
+      else return;
+      recompute();
+    });
+    $('#customRows').addEventListener('click', function (e) {
+      var el = e.target.closest('button[data-cf="remove"]');
+      if (!el) return;
+      state.ded.customs.splice(+el.dataset.ci, 1);
+      buildCustomRows();
+      recompute();
+    });
+    $('#btnAddCustom').addEventListener('click', function () {
+      if (state.ded.customs.length >= 5) { alert('自定义扣除项最多 5 条。'); return; }
+      state.ded.customs.push({ name: '', amount: 0, start: 1, declared: true });
+      buildCustomRows();
+      var inputs = document.querySelectorAll('#customRows input[data-cf="name"]');
+      if (inputs.length) inputs[inputs.length - 1].focus();
+    });
+
+    $('#bonusAmount').addEventListener('input', function (e) { state.bonusAmount = e.target.value; recompute(); });
+    $('#bonusMonth').addEventListener('change', function (e) { state.bonusMonth = +e.target.value; recompute(); });
+    $('#bonusWithheld').addEventListener('input', function (e) { state.bonusWithheld = e.target.value; recompute(); });
+    $('#bonusMode').addEventListener('change', function (e) { state.bonusMode = e.target.value; recompute(); });
+    $('#medical').addEventListener('input', function (e) { state.medical = e.target.value; recompute(); });
+    $('#other').addEventListener('input', function (e) { state.other = e.target.value; recompute(); });
+
+    $('#yearSelect').addEventListener('change', function (e) {
+      saveState();
+      loadState(+e.target.value);
+      syncInputsFromState();
+      recompute();
+    });
+
+    $('#btnFill').addEventListener('click', function () {
+      var last = -1;
+      for (var i = 0; i < 12; i++) {
+        var m = state.months[i];
+        if ((parseFloat(m.salary) || 0) > 0 || (parseFloat(m.ins) || 0) > 0) last = i;
+      }
+      if (last < 0) { alert('请先至少填写一个月的数据，再使用填充功能。'); return; }
+      var src = state.months[last];
+      var n = 0;
+      for (var j = last + 1; j < 12; j++) {
+        var t = state.months[j];
+        if (!(parseFloat(t.salary) || 0) && !(parseFloat(t.ins) || 0)) {
+          t.salary = src.salary; t.ins = src.ins;
+          n++;
+        }
+      }
+      if (!n) { alert('第 ' + (last + 1) + ' 月之后没有空月份，无需填充。'); return; }
+      syncInputsFromState();
+      recompute();
+    });
+
+    $('#btnClear').addEventListener('click', function () {
+      if (!confirm('确定清空 ' + state.year + ' 年度的全部录入数据吗？此操作不可撤销（建议先导出备份）。')) return;
+      state = freshState(state.year);
+      syncInputsFromState();
+      recompute();
+    });
+
+    $('#btnFile').addEventListener('click', bindOrUnbindFile);
+
+    $('#btnImport').addEventListener('click', function () { $('#fileImport').click(); });
+    $('#fileImport').addEventListener('change', function (e) {
+      var file = e.target.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function () {
+        try {
+          var data = JSON.parse(reader.result);
+          if (data && data.app === 'tax-calculator' && data.years && typeof data.years === 'object') {
+            // v2：多年度备份文件（自动保存到文件产生）
+            var yrs = Object.keys(data.years), latest = 0;
+            yrs.forEach(function (y) {
+              var yy = parseInt(y, 10);
+              if (yy > 0 && data.years[y] && Array.isArray(data.years[y].months)) {
+                try { localStorage.setItem(STORE_PREFIX + yy, JSON.stringify(data.years[y])); } catch (err) {}
+                if (yy > latest) latest = yy;
+              }
+            });
+            if (!latest) throw new Error('备份中没有年度数据');
+            loadState(latest);
+            syncInputsFromState();
+            recompute();
+            alert('已导入 ' + yrs.length + ' 个年度的数据，当前显示 ' + latest + ' 年度。');
+          } else if (data && Array.isArray(data.months) && data.months.length === 12) {
+            // v1：单年度备份文件
+            var year = +data.year || state.year;
+            data.year = year;
+            try { localStorage.setItem(STORE_PREFIX + year, JSON.stringify(data)); } catch (err) {}
+            loadState(year);
+            syncInputsFromState();
+            recompute();
+            alert('已导入 ' + year + ' 年度数据。');
+          } else {
+            throw new Error('格式不符');
+          }
+        } catch (err) {
+          alert('导入失败：不是有效的个税计算器备份文件（' + err.message + '）');
+        }
+      };
+      reader.readAsText(file, 'utf-8');
+      e.target.value = '';
+    });
+  }
+
+  /* ── 区块折叠 ── */
+  function readUiPref() {
+    try { return JSON.parse(localStorage.getItem('taxcalc:ui') || '{}') || {}; } catch (e) { return {}; }
+  }
+  function initCollapse() {
+    var ui = readUiPref();
+    var panels = document.querySelectorAll('main .panel');
+    panels.forEach(function (p, i) {
+      var head = p.querySelector('.panel-head');
+      if (!head) return;
+      var b = document.createElement('button');
+      b.className = 'collapse-btn';
+      b.title = '折叠 / 展开该区域';
+      b.setAttribute('aria-label', '折叠 / 展开该区域');
+      b.innerHTML = '<span class="chev">▼</span>';
+      if (ui['p' + i]) p.classList.add('collapsed');
+      b.addEventListener('click', function () {
+        p.classList.toggle('collapsed');
+        var pref = readUiPref();
+        pref['p' + i] = p.classList.contains('collapsed');
+        try { localStorage.setItem('taxcalc:ui', JSON.stringify(pref)); } catch (e) {}
+      });
+      head.appendChild(b);
+    });
+  }
+
+  /* ── 启动 ── */
+  buildMonthTable();
+  buildDedUI();
+  initCollapse();
+  loadState(REAL_YEAR);
+  syncInputsFromState();
+  bindEvents();
+  recompute();
+  restoreFileBinding();
+  detectServerSave();
+})();
+</script>
+</body>
+</html>

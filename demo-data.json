@@ -1,0 +1,41 @@
+{
+  "app": "tax-calculator",
+  "version": 2,
+  "exportedAt": "2026-09-15T00:00:00.000Z",
+  "years": {
+    "2026": {
+      "year": 2026,
+      "version": 2,
+      "months": [
+        { "salary": "12000", "ins": "1500", "note": "" },
+        { "salary": "12000", "ins": "1500", "note": "" },
+        { "salary": "12000", "ins": "1500", "note": "" },
+        { "salary": "12000", "ins": "1500", "note": "" },
+        { "salary": "12000", "ins": "1500", "note": "" },
+        { "salary": "12000", "ins": "1500", "note": "" },
+        { "salary": "25000", "ins": "2000", "note": "7 月涨薪" },
+        { "salary": "25000", "ins": "2000", "note": "" },
+        { "salary": "25000", "ins": "2000", "note": "累计跳入 10% 档" },
+        { "salary": "25000", "ins": "2000", "note": "" },
+        { "salary": "25000", "ins": "2000", "note": "" },
+        { "salary": "25000", "ins": "2000", "note": "" }
+      ],
+      "ded": {
+        "children": { "count": 1, "start": 1, "end": 12, "declared": true },
+        "infant": { "count": 0, "start": 1, "end": 12, "declared": true },
+        "elderly": { "mode": "only", "share": 1500, "start": 1, "end": 12, "declared": true },
+        "mortgage": { "on": true, "start": 1, "end": 12, "declared": false },
+        "rent": { "amount": 0, "start": 1, "end": 12, "declared": true },
+        "eduDegree": { "on": false, "start": 1, "end": 12, "declared": true },
+        "eduCert": { "on": false, "month": 1 },
+        "customs": []
+      },
+      "bonusAmount": "37000",
+      "bonusMonth": 2,
+      "bonusMode": "auto",
+      "bonusWithheld": "3490",
+      "medical": "",
+      "other": ""
+    }
+  }
+}
