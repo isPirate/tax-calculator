@@ -18,6 +18,16 @@
 
 ## 🚀 快速开始
 
+### 第一步：获取（任选其一）
+
+计算器本体只有 `index.html` 一个文件，只下载它即可完整使用：
+
+- **git 克隆**：`git clone https://github.com/isPirate/tax-calculator.git`
+- **下载 ZIP**：仓库页绿色 **Code** → **Download ZIP**，解压即可
+- **只拿单文件**：打开 [index.html](./index.html) 文件页 → 点右上角 **Raw** → `Ctrl+S` 保存
+
+前两种方式会额外获得 `serve.cjs`（自动落盘 JSON）与 `demo-data.json`（演示数据），均为可选，不影响计算功能。
+
 ### 方式一：直接双击（推荐日常使用）
 
 双击 `index.html` 用浏览器（Edge / Chrome 最佳）打开即可。数据自动保存在浏览器本地。
